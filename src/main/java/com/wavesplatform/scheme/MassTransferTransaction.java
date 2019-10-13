@@ -49,5 +49,6 @@ public class MassTransferTransaction extends Transaction {
     }
 
     //TODO hashCode, equals, toString
+    //TODO totalAmount? transactionCount?
 
 }
