@@ -14,20 +14,20 @@ public class TransferTransaction extends Transaction implements Chained {
     private final String attachment; //TODO Bytes?
     private final byte chainId;
 
-    public TransferTransaction(Bytes recipient, long amount, Bytes assetId, String attachment, long fee, long timestamp, byte chainId) {
-        this(recipient, amount, assetId, attachment, fee, timestamp, chainId, new Bytes[0], Bytes.empty());
+    public TransferTransaction(Bytes recipient, long amount, Bytes assetId, String attachment, long fee, Bytes feeAssetId, long timestamp, byte chainId) {
+        this(recipient, amount, assetId, attachment, fee, feeAssetId, timestamp, chainId, new Bytes[0], Bytes.empty());
     }
 
-    public TransferTransaction(Bytes recipient, long amount, Bytes assetId, String attachment, long fee, long timestamp, byte chainId, Bytes[] proofs) {
-        this(recipient, amount, assetId, attachment, fee, timestamp, chainId, proofs, Bytes.empty());
+    public TransferTransaction(Bytes recipient, long amount, Bytes assetId, String attachment, long fee, Bytes feeAssetId, long timestamp, byte chainId, Bytes[] proofs) {
+        this(recipient, amount, assetId, attachment, fee, feeAssetId, timestamp, chainId, proofs, Bytes.empty());
     }
 
-    public TransferTransaction(Bytes recipient, long amount, Bytes assetId, String attachment, long fee, long timestamp, byte chainId, Bytes id) {
-        this(recipient, amount, assetId, attachment, fee, timestamp, chainId, new Bytes[0], id);
+    public TransferTransaction(Bytes recipient, long amount, Bytes assetId, String attachment, long fee, Bytes feeAssetId, long timestamp, byte chainId, Bytes id) {
+        this(recipient, amount, assetId, attachment, fee, feeAssetId, timestamp, chainId, new Bytes[0], id);
     }
 
-    public TransferTransaction(Bytes recipient, long amount, Bytes assetId, String attachment, long fee, long timestamp, byte chainId, Bytes[] proofs, Bytes id) {
-        super(TYPE, fee, Bytes.empty(), timestamp, proofs, id);
+    public TransferTransaction(Bytes recipient, long amount, Bytes assetId, String attachment, long fee, Bytes feeAssetId, long timestamp, byte chainId, Bytes[] proofs, Bytes id) {
+        super(TYPE, fee, feeAssetId, timestamp, proofs, id);
         this.recipient = recipient;
         this.amount = amount;
         this.assetId = assetId;
