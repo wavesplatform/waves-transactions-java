@@ -4,29 +4,29 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.wavesplatform</groupId>
-    <artifactId>waves-scheme</artifactId>
-    <version>0.1</version>
+    <groupId>im.mak</groupId>
+    <artifactId>waves-model-java</artifactId>
+    <version>1.0</version>
 
-    <name>waves-scheme</name>
+    <name>Waves Model for Java</name>
     <description><!-- TODO --></description>
-    <url>https://github.com/wavesplatform/waves-scheme</url>
+    <url>https://github.com/msmolyakov/waves-model-java</url>
 
     <issueManagement>
-        <url>https://github.com/wavesplatform/waves-scheme/issues</url>
+        <url>https://github.com/msmolyakov/waves-model-java/issues</url>
         <system>GitHub Issues</system>
     </issueManagement>
 
     <scm>
-        <url>https://github.com/wavesplatform/waves-scheme</url>
-        <connection>scm:git:git://github.com/wavesplatform/waves-scheme.git</connection>
-        <developerConnection>scm:git:git@github.com:wavesplatform/waves-scheme.git</developerConnection>
+        <url>https://github.com/msmolyakov/waves-model-java</url>
+        <connection>scm:git:git://github.com/msmolyakov/waves-model-java.git</connection>
+        <developerConnection>scm:git:git@github.com:msmolyakov/waves-model-java.git</developerConnection>
     </scm>
 
     <developers>
         <developer>
             <name>Maxim Smolyakov</name>
-            <email>msmolyakov@web3tech.ru</email>
+            <email>smolyakovmaxim@gmail.com</email>
         </developer>
     </developers>
 
@@ -51,9 +51,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.wavesplatform</groupId>
-            <artifactId>java-lib-crypto</artifactId>
-            <version>0.1</version>
+            <groupId>im.mak</groupId>
+            <artifactId>waves-crypto-java</artifactId>
+            <version>1.0</version>
         </dependency>
 
         <!-- testing -->
