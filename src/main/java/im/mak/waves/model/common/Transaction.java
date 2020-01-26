@@ -17,6 +17,53 @@ public abstract class Transaction {
     private long timestamp;
     private Base58[] proofs;
 
+    public static abstract class TransactionBuilder {
+        protected int version;
+        protected Base58 id;
+        protected int type;
+        protected long fee;
+        protected Base58 feeAssetId;
+        protected long timestamp;
+        protected Base58[] proofs;
+
+        public TransactionBuilder version(int version) {
+            this.version = version;
+            return this;
+        }
+
+        public TransactionBuilder id(Base58 id) {
+            this.id = id;
+            return this;
+        }
+
+        public TransactionBuilder type(int type) {
+            this.type = type;
+            return this;
+        }
+
+        public TransactionBuilder fee(long fee) {
+            this.fee = fee;
+            return this;
+        }
+
+        public TransactionBuilder feeAssetId(Base58 feeAssetId) {
+            this.feeAssetId = feeAssetId;
+            return this;
+        }
+
+        public TransactionBuilder timestamp(long timestamp) {
+            this.timestamp = timestamp;
+            return this;
+        }
+
+        public TransactionBuilder proofs(Base58[] proofs) {
+            this.proofs = proofs;
+            return this;
+        }
+
+        //TODO public abstract create()
+    }
+
     public Transaction(int type, long fee, Base58 feeAssetId, long timestamp) {
         this(type, fee, feeAssetId, timestamp, new Base58[0], new Base58(Bytes.empty()));
     }

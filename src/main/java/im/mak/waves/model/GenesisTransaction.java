@@ -1,9 +1,15 @@
 package im.mak.waves.model;
 
 import im.mak.waves.crypto.Bytes;
+import im.mak.waves.crypto.account.Address;
 import im.mak.waves.crypto.base.Base58;
 
+//TODO base class
 public class GenesisTransaction {
+
+    public static final int TYPE = 1;
+
+    //TODO static'n'constructors from/to bytes
 
     private Base58 id;
     private int type;
@@ -11,13 +17,13 @@ public class GenesisTransaction {
     private long timestamp;
     private Base58 signature;
     private long amount;
-    private String recipient; //TODO Address? AddressOrAlias? Recipient? String? Bytes?
+    private Address recipient; //TODO AddressOrAlias? Recipient? Can not be alias?
 
-    public GenesisTransaction(int type, String recipient, long amount, long fee, long timestamp, Base58 signature) {
-        this(new Base58(Bytes.empty()), type, recipient, amount, fee, timestamp, signature);
+    public GenesisTransaction(int type, Address recipient, long amount, long fee, long timestamp, Base58 signature) {
+        this(type, recipient, amount, fee, timestamp, signature, new Base58(Bytes.empty()));
     }
 
-    public GenesisTransaction(Base58 id, int type, String recipient, long amount, long fee, long timestamp, Base58 signature) {
+    public GenesisTransaction(int type, Address recipient, long amount, long fee, long timestamp, Base58 signature, Base58 id) {
         this.id = id; //TODO copy?
         this.type = type;
         this.fee = fee;
@@ -29,12 +35,12 @@ public class GenesisTransaction {
 
     //TODO hashCode, equals, toString
 
-    public long amount() {
-        return amount;
+    public Address recipient() {
+        return recipient;
     }
 
-    public String recipient() {
-        return recipient;
+    public long amount() {
+        return amount;
     }
 
     public int type() {
