@@ -14,6 +14,7 @@ import java.util.Arrays;
 public class PublicKey extends Base58String {
 
     public static final int BYTES_LENGTH = 32;
+    public static final PublicKey ZERO = PublicKey.as(new byte[BYTES_LENGTH]);
 
     /**
      * Generate public key from the private key.
