@@ -81,8 +81,6 @@ public abstract class JsonSerializer {
         long timestamp = json.get("timestamp").asLong();
         //todo validate id if exists? configurable?
 
-        Scheme scheme = Scheme.of(type, version);
-
         List<Proof> proofs = new ArrayList<>();
         if (json.has("proofs")) {
             JsonNode jProofs = json.get("proofs");
@@ -242,6 +240,9 @@ public abstract class JsonSerializer {
             String name = json.get("name").asText();
             String description = json.get("description").asText();
             return new UpdateAssetInfoTransaction(sender, assetId, name, description, chainId, fee, timestamp, version, proofs);
+        } else if (type == InvokeExpressionTransaction.TYPE) {
+            Base64String expression = base64FromJson(json, "expression");
+            return new InvokeExpressionTransaction(sender, expression, chainId, fee, timestamp, version, proofs);
         }
 
         throw new IOException("Can't parse json of transaction with type " + type);
@@ -549,7 +550,11 @@ public abstract class JsonSerializer {
     }
 
     public static Base64String scriptFromJson(JsonNode json) {
-        return json.hasNonNull("script") ? new Base64String(json.get("script").asText()) : Base64String.empty();
+        return base64FromJson(json, "script");
+    }
+
+    public static Base64String base64FromJson(JsonNode json, String fieldName) {
+        return json.hasNonNull(fieldName) ? new Base64String(json.get(fieldName).asText()) : Base64String.empty();
     }
 
     public static String scriptToJson(Base64String script) {

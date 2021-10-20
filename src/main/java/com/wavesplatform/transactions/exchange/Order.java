@@ -12,6 +12,7 @@ import com.wavesplatform.transactions.serializers.binary.BinarySerializer;
 import com.wavesplatform.transactions.serializers.json.JsonSerializer;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -114,7 +115,7 @@ public class Order extends TransactionOrOrder {
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), bodyBytes());
+        return Objects.hash(super.hashCode(), Arrays.hashCode(bodyBytes()));
     }
 
     public static class OrderBuilder extends TransactionOrOrderBuilder<OrderBuilder, Order> {

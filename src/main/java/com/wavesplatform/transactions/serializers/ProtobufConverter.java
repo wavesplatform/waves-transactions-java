@@ -19,6 +19,7 @@ import com.wavesplatform.transactions.serializers.binary.BytesReader;
 import com.wavesplatform.transactions.serializers.binary.BytesWriter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.wavesplatform.protobuf.transaction.TransactionOuterClass.DataTransactionData.DataEntry.ValueCase.*;
@@ -53,7 +54,7 @@ public abstract class ProtobufConverter {
 
     public static Transaction fromProtobuf(TransactionOuterClass.SignedTransaction pbSignedTx) throws IOException {
         Transaction tx;
-        TransactionOuterClass.Transaction pbTx = pbSignedTx.getTransaction();
+        TransactionOuterClass.Transaction pbTx = pbSignedTx.getWavesTransaction();
 
         if (pbTx.hasGenesis()) {
             TransactionOuterClass.GenesisTransactionData genesis = pbTx.getGenesis();
@@ -263,6 +264,17 @@ public abstract class ProtobufConverter {
                     .fee(pbAmountToAmount(pbTx.getFee()))
                     .timestamp(pbTx.getTimestamp())
                     .getUnsigned();
+        } else if (pbTx.hasInvokeExpression()) {
+            TransactionOuterClass.InvokeExpressionTransactionData invokeExpression = pbTx.getInvokeExpression();
+            tx = new InvokeExpressionTransaction(
+                    PublicKey.as(pbTx.getSenderPublicKey().toByteArray()),
+                    new Base64String(invokeExpression.getExpression().toByteArray()),
+                    (byte)pbTx.getChainId(),
+                    pbAmountToAmount(pbTx.getFee()),
+                    pbTx.getTimestamp(),
+                    pbTx.getVersion(),
+                    new ArrayList<>()
+            );
         } else throw new InvalidProtocolBufferException("Can't recognize transaction type");
 
         pbSignedTx.getProofsList().forEach(p -> tx.proofs().add(Proof.as(p.toByteArray())));
@@ -440,6 +452,11 @@ public abstract class ProtobufConverter {
                     .setName(uaiTx.name())
                     .setDescription(uaiTx.description())
                     .build());
+        } else if (tx instanceof InvokeExpressionTransaction) {
+            InvokeExpressionTransaction iet = (InvokeExpressionTransaction) tx;
+            protoBuilder.setInvokeExpression(TransactionOuterClass.InvokeExpressionTransactionData.newBuilder()
+                    .setExpression(ByteString.copyFrom(iet.expression().bytes()))
+                    .build());
         }
 
         return protoBuilder.build();
@@ -456,7 +473,7 @@ public abstract class ProtobufConverter {
 
     public static TransactionOuterClass.SignedTransaction toProtobuf(Transaction tx) {
         return TransactionOuterClass.SignedTransaction.newBuilder()
-                .setTransaction(toUnsignedProtobuf(tx))
+                .setWavesTransaction(toUnsignedProtobuf(tx))
                 .addAllProofs(tx.proofs()
                         .stream()
                         .map(p -> ByteString.copyFrom(p.bytes()))

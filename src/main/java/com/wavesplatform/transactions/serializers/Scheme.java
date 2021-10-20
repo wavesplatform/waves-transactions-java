@@ -30,6 +30,10 @@ public enum Scheme {
         if (txType == UpdateAssetInfoTransaction.TYPE) {
             if (txVersion >= 1) return Scheme.PROTOBUF;
         }
+        if (txType == InvokeExpressionTransaction.TYPE) {
+            if (txVersion >= 1) return Scheme.PROTOBUF;
+        }
+
         throw new IllegalArgumentException("Unsupported transaction type " + txType + " with version " + txVersion);
     }
 
