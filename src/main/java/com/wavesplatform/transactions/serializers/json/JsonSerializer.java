@@ -474,6 +474,9 @@ public abstract class JsonSerializer {
                 jsObject.put("assetId", assetIdToJson(uaiTx.assetId()))
                         .put("name", uaiTx.name())
                         .put("description", uaiTx.description());
+            } else if (tx instanceof InvokeExpressionTransaction) {
+                InvokeExpressionTransaction ieTx = (InvokeExpressionTransaction) tx;
+                jsObject.put("expression", ieTx.expression().encodedWithPrefix());
             }
 
             jsObject.put("fee", tx.fee().value());

@@ -4,7 +4,6 @@ import com.wavesplatform.transactions.account.PublicKey;
 import com.wavesplatform.transactions.common.Amount;
 import com.wavesplatform.transactions.common.Base64String;
 import com.wavesplatform.transactions.common.Proof;
-import com.wavesplatform.transactions.common.Recipient;
 
 import java.io.IOException;
 import java.util.List;
@@ -38,6 +37,10 @@ public class InvokeExpressionTransaction extends Transaction {
         return (InvokeExpressionTransaction) Transaction.fromJson(json);
     }
 
+    public static InvokeExpressionTransactionBuilder builder(Base64String expression) {
+        return new InvokeExpressionTransactionBuilder(expression);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -52,4 +55,19 @@ public class InvokeExpressionTransaction extends Transaction {
         return Objects.hash(super.hashCode(), expression);
     }
 
+    public static class InvokeExpressionTransactionBuilder
+            extends TransactionBuilder<InvokeExpressionTransactionBuilder, InvokeExpressionTransaction> {
+        private final Base64String expression;
+
+        protected InvokeExpressionTransactionBuilder(Base64String expression) {
+            super(LATEST_VERSION, MIN_FEE);
+            this.expression = expression;
+        }
+
+
+        protected InvokeExpressionTransaction _build() {
+            return new InvokeExpressionTransaction(sender, expression, chainId, feeWithExtra(),
+                    timestamp, version, Proof.emptyList());
+        }
+    }
 }

@@ -11,6 +11,7 @@ import com.wavesplatform.transactions.serializers.binary.BinarySerializer;
 import com.wavesplatform.transactions.serializers.json.JsonSerializer;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -122,7 +123,7 @@ public abstract class TransactionOrOrder {
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.bodyBytes(), proofs);
+        return Objects.hash(Arrays.hashCode(this.bodyBytes()), proofs);
     }
 
     @Override

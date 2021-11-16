@@ -19,7 +19,6 @@ import com.wavesplatform.transactions.serializers.binary.BytesReader;
 import com.wavesplatform.transactions.serializers.binary.BytesWriter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 import static com.wavesplatform.protobuf.transaction.TransactionOuterClass.DataTransactionData.DataEntry.ValueCase.*;
@@ -244,9 +243,9 @@ public abstract class ProtobufConverter {
             TransactionOuterClass.InvokeScriptTransactionData invoke = pbTx.getInvokeScript();
             Function functionCall = new BytesReader(invoke.getFunctionCall().toByteArray()).readFunctionCall();
             tx = InvokeScriptTransaction
-                    .builder(recipientFromProto(invoke.getDApp(), (byte)pbTx.getChainId()), functionCall)
+                    .builder(recipientFromProto(invoke.getDApp(), (byte) pbTx.getChainId()), functionCall)
                     .payments(invoke.getPaymentsList().stream().map(p ->
-                            Amount.of(p.getAmount(), AssetId.as(p.getAssetId().toByteArray())))
+                                    Amount.of(p.getAmount(), AssetId.as(p.getAssetId().toByteArray())))
                             .collect(toList()))
                     .version(pbTx.getVersion())
                     .chainId((byte) pbTx.getChainId())
@@ -266,15 +265,14 @@ public abstract class ProtobufConverter {
                     .getUnsigned();
         } else if (pbTx.hasInvokeExpression()) {
             TransactionOuterClass.InvokeExpressionTransactionData invokeExpression = pbTx.getInvokeExpression();
-            tx = new InvokeExpressionTransaction(
-                    PublicKey.as(pbTx.getSenderPublicKey().toByteArray()),
-                    new Base64String(invokeExpression.getExpression().toByteArray()),
-                    (byte)pbTx.getChainId(),
-                    pbAmountToAmount(pbTx.getFee()),
-                    pbTx.getTimestamp(),
-                    pbTx.getVersion(),
-                    new ArrayList<>()
-            );
+            tx = InvokeExpressionTransaction
+                    .builder(new Base64String(invokeExpression.getExpression().toByteArray()))
+                    .sender(PublicKey.as(pbTx.getSenderPublicKey().toByteArray()))
+                    .chainId((byte) pbTx.getChainId())
+                    .fee(pbAmountToAmount(pbTx.getFee()))
+                    .timestamp(pbTx.getTimestamp())
+                    .version(pbTx.getVersion())
+                    .getUnsigned();
         } else throw new InvalidProtocolBufferException("Can't recognize transaction type");
 
         pbSignedTx.getProofsList().forEach(p -> tx.proofs().add(Proof.as(p.toByteArray())));
@@ -391,14 +389,14 @@ public abstract class ProtobufConverter {
         } else if (tx instanceof MassTransferTransaction) {
             MassTransferTransaction mtTx = (MassTransferTransaction) tx;
             protoBuilder.setMassTransfer(TransactionOuterClass.MassTransferTransactionData.newBuilder()
-                    .addAllTransfers(mtTx.transfers().stream().map(t ->
-                        TransactionOuterClass.MassTransferTransactionData.Transfer.newBuilder()
-                                .setRecipient(recipientToProto(t.recipient()))
-                                .setAmount(t.amount())
-                                .build()
-                    ).collect(toList()))
-                    .setAssetId(ByteString.copyFrom(mtTx.assetId().bytes()))
-                    .setAttachment(ByteString.copyFrom(mtTx.attachment().bytes())))
+                            .addAllTransfers(mtTx.transfers().stream().map(t ->
+                                    TransactionOuterClass.MassTransferTransactionData.Transfer.newBuilder()
+                                            .setRecipient(recipientToProto(t.recipient()))
+                                            .setAmount(t.amount())
+                                            .build()
+                            ).collect(toList()))
+                            .setAssetId(ByteString.copyFrom(mtTx.assetId().bytes()))
+                            .setAttachment(ByteString.copyFrom(mtTx.attachment().bytes())))
                     .build();
         } else if (tx instanceof DataTransaction) {
             DataTransaction dtx = (DataTransaction) tx;
@@ -406,10 +404,11 @@ public abstract class ProtobufConverter {
                     .addAllData(dtx.data().stream().map(e -> {
                         TransactionOuterClass.DataTransactionData.DataEntry.Builder builder =
                                 TransactionOuterClass.DataTransactionData.DataEntry.newBuilder().setKey(e.key());
-                        if (e instanceof BinaryEntry) builder.setBinaryValue(ByteString.copyFrom(((BinaryEntry)e).value().bytes())).build();
-                        else if (e instanceof BooleanEntry) builder.setBoolValue(((BooleanEntry)e).value()).build();
-                        else if (e instanceof IntegerEntry) builder.setIntValue(((IntegerEntry)e).value()).build();
-                        else if (e instanceof StringEntry) builder.setStringValue(((StringEntry)e).value()).build();
+                        if (e instanceof BinaryEntry)
+                            builder.setBinaryValue(ByteString.copyFrom(((BinaryEntry) e).value().bytes())).build();
+                        else if (e instanceof BooleanEntry) builder.setBoolValue(((BooleanEntry) e).value()).build();
+                        else if (e instanceof IntegerEntry) builder.setIntValue(((IntegerEntry) e).value()).build();
+                        else if (e instanceof StringEntry) builder.setStringValue(((StringEntry) e).value()).build();
                         else if (e instanceof DeleteEntry) builder.setKey(e.key());
                         else throw new IllegalArgumentException("Unknown entry type " + e.type());
                         return builder.build();
@@ -464,6 +463,7 @@ public abstract class ProtobufConverter {
 
     public static OrderOuterClass.Order toProtobuf(Order order) {
         return OrderOuterClass.Order.newBuilder(toUnsignedProtobuf(order))
+                .setEip712Signature(order.eip712Signature() == null ? ByteString.EMPTY : ByteString.copyFrom(order.eip712Signature()))
                 .addAllProofs(order.proofs()
                         .stream()
                         .map(p -> ByteString.copyFrom(p.bytes()))
