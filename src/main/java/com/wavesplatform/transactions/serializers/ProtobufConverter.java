@@ -52,6 +52,14 @@ public abstract class ProtobufConverter {
     }
 
     public static Transaction fromProtobuf(TransactionOuterClass.SignedTransaction pbSignedTx) throws IOException {
+        if (!pbSignedTx.getEthereumTransaction().isEmpty()) {
+            return EthereumTransaction.parse(pbSignedTx.getEthereumTransaction().toByteArray());
+        }
+
+        if (!pbSignedTx.hasWavesTransaction()) {
+            throw new InvalidProtocolBufferException("Both waves transaction and ethereum transactions are missing");
+        }
+
         Transaction tx;
         TransactionOuterClass.Transaction pbTx = pbSignedTx.getWavesTransaction();
 

@@ -243,6 +243,8 @@ public abstract class JsonSerializer {
         } else if (type == InvokeExpressionTransaction.TYPE) {
             Base64String expression = base64FromJson(json, "expression");
             return new InvokeExpressionTransaction(sender, expression, chainId, fee, timestamp, version, proofs);
+        } else if (type == EthereumTransaction.TYPE_TAG) {
+            return EthereumTransaction.parse(json.get("data").asText());
         }
 
         throw new IOException("Can't parse json of transaction with type " + type);
