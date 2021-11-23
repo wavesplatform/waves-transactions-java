@@ -7,16 +7,29 @@ import com.wavesplatform.transactions.common.Amount;
 import com.wavesplatform.transactions.common.AssetId;
 import com.wavesplatform.transactions.common.Id;
 import com.wavesplatform.transactions.common.Proof;
+import com.wavesplatform.transactions.invocation.*;
+import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.TypeEncoder;
+import org.web3j.abi.datatypes.DynamicArray;
+import org.web3j.abi.datatypes.DynamicBytes;
+import org.web3j.abi.datatypes.Type;
+import org.web3j.abi.datatypes.Utf8String;
+import org.web3j.abi.datatypes.generated.Int64;
+import org.web3j.abi.datatypes.generated.StaticArray2;
 import org.web3j.abi.datatypes.generated.Uint256;
+import org.web3j.abi.datatypes.generated.Uint8;
 import org.web3j.crypto.*;
+import org.web3j.utils.Convert;
 import org.web3j.utils.Numeric;
 
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -25,8 +38,9 @@ public class EthereumTransaction extends Transaction {
     public static final int TYPE_TAG = 19;
     public static final String ERC20_PREFIX = "0xa9059cbb";
     public static final int ADDRESS_LENGTH = 20;
+    public static final BigInteger DEFAULT_GAS_PRICE = Convert.toWei("10", Convert.Unit.GWEI).toBigInteger();
 
-    private final long gasPrice;
+    private final BigInteger gasPrice;
     private final Payload payload;
     private final Sign.SignatureData signatureData;
 
@@ -41,7 +55,7 @@ public class EthereumTransaction extends Transaction {
         }
     }
 
-    private EthereumTransaction(byte chainId, long timestamp, long gasPrice, long fee, Payload payload, Sign.SignatureData signatureData, PublicKey sender) {
+    public EthereumTransaction(byte chainId, long timestamp, BigInteger gasPrice, long fee, Payload payload, Sign.SignatureData signatureData, PublicKey sender) {
         super(0, 0, chainId, sender, Amount.of(fee), timestamp, Collections.emptyList());
         this.gasPrice = gasPrice;
         this.payload = payload;
@@ -50,7 +64,7 @@ public class EthereumTransaction extends Transaction {
 
     @Override
     public Id id() {
-        return Id.as(Hash.sha3(encode(payload.toRawTransaction(timestamp(), gasPrice, fee().value()), signatureData)));
+        return Id.as(Hash.sha3(toBytes()));
     }
 
     @Override
@@ -66,7 +80,7 @@ public class EthereumTransaction extends Transaction {
         return Arrays.equals(id().bytes(), that.id().bytes());
     }
 
-    public long gasPrice() {
+    public BigInteger gasPrice() {
         return gasPrice;
     }
 
@@ -114,7 +128,7 @@ public class EthereumTransaction extends Transaction {
     }
 
     public interface Payload {
-        RawTransaction toRawTransaction(long timestamp, long gasPrice, long fee);
+        RawTransaction toRawTransaction(long timestamp, BigInteger gasPrice, long fee);
     }
 
     public static byte[] publicKeyBytes(BigInteger publicKey) {
@@ -124,6 +138,11 @@ public class EthereumTransaction extends Transaction {
                 publicKeyBytes.length - PublicKey.ETH_BYTES_LENGTH,
                 publicKeyBytes.length
         );
+    }
+
+    @Override
+    public byte[] toBytes() {
+        return encode(payload.toRawTransaction(timestamp(), gasPrice, fee().value()), signatureData);
     }
 
     public static byte[] encode(RawTransaction transaction, Sign.SignatureData signatureData) {
@@ -145,12 +164,20 @@ public class EthereumTransaction extends Transaction {
             this.amount = amount;
         }
 
+        public Address recipient() {
+            return recipient;
+        }
+
+        public Amount amount() {
+            return amount;
+        }
+
         @Override
-        public RawTransaction toRawTransaction(long timestamp, long gasPrice, long fee) {
+        public RawTransaction toRawTransaction(long timestamp, BigInteger gasPrice, long fee) {
             if (amount.assetId().isWaves()) {
                 return RawTransaction.createEtherTransaction(
                         BigInteger.valueOf(timestamp),
-                        BigInteger.valueOf(gasPrice),
+                        gasPrice,
                         BigInteger.valueOf(fee),
                         Numeric.toHexString(recipient.publicKeyHash()),
                         BigInteger.valueOf(amount.value()).multiply(AMOUNT_MULTIPLIER)
@@ -158,33 +185,123 @@ public class EthereumTransaction extends Transaction {
             } else {
                 return RawTransaction.createTransaction(
                         BigInteger.valueOf(timestamp),
-                        BigInteger.valueOf(gasPrice),
+                        gasPrice,
                         BigInteger.valueOf(fee),
                         Numeric.toHexString(amount.assetId().bytes(), 0, ADDRESS_LENGTH, true),
                         BigInteger.ZERO,
                         ERC20_PREFIX +
-                                Numeric.toHexStringNoPrefix(recipient.publicKeyHash()) +
+                                TypeEncoder.encode(new org.web3j.abi.datatypes.Address(new BigInteger(1, recipient.publicKeyHash()))) +
                                 TypeEncoder.encode(new Uint256(amount.value()))
                 );
             }
         }
     }
 
-    public static EthereumTransaction transfer(Address recipient, Amount amount, long gasPrice,
-                                               byte chainId, long fee, long timestamp, Sign.SignatureData signatureData) {
-        Payload payload = new Transfer(recipient, amount);
-        PublicKey sender = PublicKey.as(publicKeyBytes(Sign.recoverFromSignature(
+    public static class Invocation implements Payload {
+        private final Address dapp;
+        private final Function function;
+        private final List<Amount> payments;
+
+        public Invocation(Address dapp, Function function, List<Amount> payments) {
+            this.dapp = dapp;
+            this.function = function;
+            this.payments = payments;
+        }
+
+        public Address dApp() {
+            return dapp;
+        }
+
+        public Function function() {
+            return function;
+        }
+
+        public List<Amount> payments() {
+            return payments;
+        }
+
+        private void addArgs(ArrayList<Type> target, List<Arg> source, boolean allowNesting) {
+            for (Arg arg : source) {
+                if (arg instanceof BinaryArg) {
+                    target.add(new DynamicBytes(((BinaryArg) arg).value().bytes()));
+                } else if (arg instanceof StringArg) {
+                    target.add(new Utf8String(((StringArg) arg).value()));
+                } else if (arg instanceof IntegerArg) {
+                    target.add(new Int64(((IntegerArg) arg).value()));
+                } else if (arg instanceof BooleanArg) {
+                    target.add(new Uint8(((BooleanArg) arg).value() ? 1 : 0));
+                } else if (arg instanceof ListArg) {
+                    if (!allowNesting) {
+                        throw new IllegalArgumentException("Nested lists are not supported");
+                    }
+                    ArrayList<Type> listValues = new ArrayList<>();
+                    addArgs(listValues, ((ListArg) arg).value(), false);
+                    target.add(new DynamicArray<>(listValues));
+                }
+            }
+        }
+
+        @Override
+        public RawTransaction toRawTransaction(long timestamp, BigInteger gasPrice, long fee) {
+            ArrayList<Type> params = new ArrayList<>();
+            addArgs(params, function.args(), true);
+
+            List<StaticArray2> encodedPayments = payments.stream().map(a -> new StaticArray2(Uint256.class, new Uint256(1), new Uint256(10))).collect(Collectors.toList());
+            DynamicArray<StaticArray2> paymentArgs = new DynamicArray<>(StaticArray2.class, encodedPayments);
+            params.add(paymentArgs);
+
+            org.web3j.abi.datatypes.Function f = new org.web3j.abi.datatypes.Function(
+                    function.isDefault() ? "default" : function.name(),
+                    params,
+                    Collections.emptyList()
+            );
+            return RawTransaction.createTransaction(
+                    BigInteger.valueOf(timestamp),
+                    gasPrice,
+                    BigInteger.valueOf(fee),
+                    Numeric.toHexString(dapp.publicKeyHash()),
+                    FunctionEncoder.encode(f)
+            );
+        }
+    }
+
+    public static PublicKey recoverFromSignature(Sign.SignatureData signatureData, byte chainId, RawTransaction rawTransaction) {
+        return PublicKey.as(publicKeyBytes(Sign.recoverFromSignature(
                 Sign.getRecId(signatureData, chainId),
                 new ECDSASignature(
                         new BigInteger(1, signatureData.getR()),
                         new BigInteger(1, signatureData.getS())),
-                TransactionEncoder.encode(payload.toRawTransaction(timestamp, gasPrice, fee), (long) chainId)
+                TransactionEncoder.encode(rawTransaction, (long) chainId)
         )));
+    }
+
+    public static EthereumTransaction transfer(Address recipient, Amount amount,
+                                               BigInteger gasPrice, byte chainId, long fee, long timestamp, Sign.SignatureData signatureData) {
+        Payload payload = new Transfer(recipient, amount);
+        PublicKey sender = recoverFromSignature(signatureData, chainId, payload.toRawTransaction(timestamp, gasPrice, fee));
 
         return new EthereumTransaction(chainId, timestamp, gasPrice, fee, payload, signatureData, sender);
     }
 
-    public static EthereumTransaction createAndSign(Payload payload, long gasPrice, byte chainId, long fee, long timestamp, ECKeyPair keyPair) {
+    public static EthereumTransaction transfer(Address recipient, Amount amount,
+                                               BigInteger gasPrice, byte chainId, long fee, long timestamp, ECKeyPair keyPair) {
+        return createAndSign(new Transfer(recipient, amount), gasPrice, chainId, fee, timestamp, keyPair);
+    }
+
+    public static EthereumTransaction invocation(Address dapp, Function function, List<Amount> payments,
+                                                 BigInteger gasPrice, byte chainId, long fee, long timestamp, Sign.SignatureData signatureData) {
+        Payload payload = new Invocation(dapp, function, payments);
+        PublicKey sender = recoverFromSignature(signatureData, chainId, payload.toRawTransaction(timestamp, gasPrice, fee));
+
+        return new EthereumTransaction(chainId, timestamp, gasPrice, fee, payload, signatureData, sender);
+    }
+
+    public static EthereumTransaction invocation(Address dapp, Function function, List<Amount> payments,
+                                                 BigInteger gasPrice, byte chainId, long fee, long timestamp, ECKeyPair keyPair) {
+        return createAndSign(new Invocation(dapp, function, payments), gasPrice, chainId, fee, timestamp, keyPair);
+    }
+
+    public static EthereumTransaction createAndSign(Payload payload, BigInteger gasPrice, byte chainId, long fee, long timestamp, ECKeyPair keyPair) {
         RawTransaction rawTransaction = payload.toRawTransaction(timestamp, gasPrice, fee);
         byte[] transactionBytes = TransactionEncoder.encode(rawTransaction, (long) chainId);
         Sign.SignatureData signatureData = TransactionEncoder.createEip155SignatureData(Sign.signMessage(transactionBytes, keyPair), (long) chainId);
@@ -193,11 +310,6 @@ public class EthereumTransaction extends Transaction {
         return new EthereumTransaction(chainId, timestamp, gasPrice, fee, payload, signatureData, sender);
     }
 
-    public static EthereumTransaction transfer(Address recipient, Amount amount, long gasPrice,
-                                               byte chainId, long fee, long timestamp, ECKeyPair keyPair) {
-        Payload payload = new Transfer(recipient, amount);
-        return createAndSign(payload, gasPrice, chainId, fee, timestamp, keyPair);
-    }
 
     public static EthereumTransaction parse(String transactionBytesAsHex) {
         SignedRawTransaction srt = (SignedRawTransaction) TransactionDecoder.decode(transactionBytesAsHex);
@@ -206,7 +318,7 @@ public class EthereumTransaction extends Transaction {
             return EthereumTransaction.transfer(
                     Address.fromPart(srt.getChainId().byteValue(), Numeric.hexStringToByteArray(srt.getTo())),
                     Amount.of(srt.getValue().divide(AMOUNT_MULTIPLIER).longValueExact()),
-                    srt.getGasPrice().longValueExact(),
+                    srt.getGasPrice(),
                     srt.getChainId().byteValue(),
                     srt.getGasLimit().longValueExact(),
                     srt.getNonce().longValueExact(),
@@ -222,7 +334,7 @@ public class EthereumTransaction extends Transaction {
                             Numeric.toBigInt(data.substring(72)).divide(AMOUNT_MULTIPLIER).longValueExact(),
                             AssetId.as(Numeric.hexStringToByteArray(srt.getTo()))
                     ),
-                    srt.getGasPrice().longValueExact(),
+                    srt.getGasPrice(),
                     srt.getChainId().byteValue(),
                     srt.getGasLimit().longValueExact(),
                     srt.getNonce().longValueExact(),

@@ -16,6 +16,10 @@ import com.wavesplatform.transactions.exchange.OrderType;
 import com.wavesplatform.transactions.invocation.*;
 import com.wavesplatform.transactions.mass.Transfer;
 import com.wavesplatform.transactions.serializers.Scheme;
+import org.web3j.crypto.RawTransaction;
+import org.web3j.crypto.Sign;
+import org.web3j.crypto.SignedRawTransaction;
+import org.web3j.crypto.TransactionDecoder;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,7 +28,7 @@ import java.util.List;
 public abstract class JsonSerializer {
 
     public static final ObjectMapper JSON_MAPPER = new ObjectMapper();
-    
+
     public static Order orderFromJson(JsonNode json) throws IOException {
         int version = json.get("version").asInt();
 
@@ -104,7 +108,8 @@ public abstract class JsonSerializer {
             return new IssueTransaction(sender, json.get("name").asText(), json.get("description").asText(),
                     json.get("quantity").asLong(), json.get("decimals").asInt(), json.get("reissuable").asBoolean(),
                     scriptFromJson(json), chainId, fee, timestamp, version, proofs);
-        } if (type == TransferTransaction.TYPE) {
+        }
+        if (type == TransferTransaction.TYPE) {
             Recipient recipient = recipientFromJson(json.get("recipient"));
             if (version < 3)
                 chainId = recipient.chainId();
@@ -175,7 +180,8 @@ public abstract class JsonSerializer {
                 proofs = Proof.list(Proof.as(json.get("signature").asText()));
             return new CreateAliasTransaction(
                     sender, json.get("alias").asText(), chainId, fee, timestamp, version, proofs);
-        } if (type == MassTransferTransaction.TYPE) {
+        }
+        if (type == MassTransferTransaction.TYPE) {
             //todo check transferCount, totalAmount?
             JsonNode jsTransfers = json.get("transfers");
             List<Transfer> transfers = new ArrayList<>();
@@ -218,20 +224,7 @@ public abstract class JsonSerializer {
             AssetId assetId = assetIdFromJson(json.get("assetId"));
             return new SetAssetScriptTransaction(sender, assetId, scriptFromJson(json), chainId, fee, timestamp, version, proofs);
         } else if (type == InvokeScriptTransaction.TYPE) {
-            Recipient dApp = recipientFromJson(json.get("dApp"));
-            Function function = Function.asDefault();
-            if (json.hasNonNull("call")) {
-                JsonNode call = json.get("call");
-                List<Arg> args = call.hasNonNull("args") ? argsFromJson(call.get("args")) : new ArrayList<>();
-                function = Function.as(call.get("function").asText(), args);
-            }
-            List<Amount> payments = new ArrayList<>();
-            String paymentsFieldName = "payment";
-            if (json.hasNonNull(paymentsFieldName))
-                json.get(paymentsFieldName).forEach(p ->
-                        payments.add(Amount.of(p.get("amount").asLong(), assetIdFromJson(p.get("assetId")))));
-            return new InvokeScriptTransaction(
-                    sender, dApp, function, payments, chainId, fee, timestamp, version, proofs);
+            return new InvokeScriptTransaction(sender, recipientFromJson(json.get("dApp")), functionFromJson(json), paymentsFromJson(json), chainId, fee, timestamp, version, proofs);
         } else if (type == UpdateAssetInfoTransaction.TYPE) {
             if (!fee.assetId().isWaves())
                 throw new IOException("feeAssetId field must be null for UpdateAssetInfoTransaction");
@@ -244,12 +237,34 @@ public abstract class JsonSerializer {
             Base64String expression = base64FromJson(json, "expression");
             return new InvokeExpressionTransaction(sender, expression, chainId, fee, timestamp, version, proofs);
         } else if (type == EthereumTransaction.TYPE_TAG) {
-            return EthereumTransaction.parse(json.get("data").asText());
+            RawTransaction rt = TransactionDecoder.decode(json.get("bytes").asText());
+            Sign.SignatureData signatureData = rt instanceof SignedRawTransaction ?
+                    ((SignedRawTransaction) rt).getSignatureData() :
+                    new Sign.SignatureData(new byte[]{chainId}, new byte[]{}, new byte[]{});
+
+            JsonNode payload = json.get("payload");
+            switch (payload.get("type").asText()) {
+                case "invocation":
+                    return new EthereumTransaction(chainId, rt.getNonce().longValueExact(), rt.getGasPrice(), fee.value(),
+                            new EthereumTransaction.Invocation(
+                                    Address.as(payload.get("dApp").asText()),
+                                    functionFromJson(payload.get("call")),
+                                    paymentsFromJson(payload.get("payment"))), signatureData, sender);
+                case "transfer":
+                    AssetId assetId = assetIdFromJson(payload.get("assetId"));
+                    return new EthereumTransaction(chainId, rt.getNonce().longValueExact(), rt.getGasPrice(), fee.value(),
+                            new EthereumTransaction.Transfer(
+                                    Address.as(payload.get("dApp").asText()),
+                                    Amount.of(json.get("amount").asLong(), assetId)
+                            ), signatureData, sender);
+                default:
+                    throw new IOException("Unsupported payload type");
+            }
         }
 
         throw new IOException("Can't parse json of transaction with type " + type);
     }
-    
+
     public static Transaction fromJson(String json) throws IOException {
         return fromJson(JSON_MAPPER.readTree(json));
     }
@@ -264,19 +279,19 @@ public abstract class JsonSerializer {
     }
 
     public static DataEntry dataEntryFromJson(JsonNode json) {
-            String key = json.get("key").asText();
-            String entryType = json.hasNonNull("type") ? json.get("type").asText() : "";
-            if (entryType.isEmpty())
-                return new DeleteEntry(key);
-            else if (entryType.equals("binary"))
-                return new BinaryEntry(key, Base64.decode(json.get("value").asText()));
-            else if (entryType.equals("boolean"))
-                return new BooleanEntry(key, json.get("value").asBoolean());
-            else if (entryType.equals("integer"))
-                return new IntegerEntry(key, json.get("value").asLong());
-            else if (entryType.equals("string"))
-                return new StringEntry(key, json.get("value").asText());
-            else throw new IllegalArgumentException("Unknown type `" + entryType + "` of entry with key `" + key + "`");
+        String key = json.get("key").asText();
+        String entryType = json.hasNonNull("type") ? json.get("type").asText() : "";
+        if (entryType.isEmpty())
+            return new DeleteEntry(key);
+        else if (entryType.equals("binary"))
+            return new BinaryEntry(key, Base64.decode(json.get("value").asText()));
+        else if (entryType.equals("boolean"))
+            return new BooleanEntry(key, json.get("value").asBoolean());
+        else if (entryType.equals("integer"))
+            return new IntegerEntry(key, json.get("value").asLong());
+        else if (entryType.equals("string"))
+            return new StringEntry(key, json.get("value").asText());
+        else throw new IllegalArgumentException("Unknown type `" + entryType + "` of entry with key `" + key + "`");
     }
 
     public static JsonNode toJsonObject(TransactionOrOrder txOrOrder) {
@@ -301,7 +316,7 @@ public abstract class JsonSerializer {
                     .put("timestamp", order.timestamp())
                     .put("expiration", order.expiration());
             if (order.proofs().size() > 0)
-                    jsObject.put("signature", order.proofs().get(0).toString());
+                jsObject.put("signature", order.proofs().get(0).toString());
 
             if (order.version() < 3)
                 jsObject.remove("matcherFeeAssetId");
@@ -351,9 +366,7 @@ public abstract class JsonSerializer {
                 }
             } else if (tx instanceof TransferTransaction) {
                 TransferTransaction ttx = (TransferTransaction) tx;
-                jsObject.put("recipient", ttx.recipient().toString())
-                        .put("amount", ttx.amount().value())
-                        .put("assetId", assetIdToJson(ttx.amount().assetId()))
+                transferToJson(jsObject, ttx.recipient(), ttx.amount())
                         .put("attachment", Base58.encode(ttx.attachment().bytes()));
                 if (ttx.version() < 3)
                     jsObject.remove("chainId");
@@ -457,18 +470,7 @@ public abstract class JsonSerializer {
                         .put("script", scriptToJson(sasTx.script()));
             } else if (tx instanceof InvokeScriptTransaction) {
                 InvokeScriptTransaction isTx = (InvokeScriptTransaction) tx;
-                jsObject.put("dApp", isTx.dApp().toString());
-                if (!isTx.function().isDefault()) {
-                    ObjectNode call = jsObject.putObject("call");
-                    call.put("function", isTx.function().name());
-                    argsToJson(call.putArray("args"), isTx.function().args());
-                }
-                ArrayNode payments = jsObject.putArray("payment");
-                isTx.payments().forEach(p -> {
-                    ObjectNode payment = payments.addObject();
-                    payment.put("amount", p.value()).
-                            put("assetId", assetIdToJson(p.assetId()));
-                });
+                invocationToJson(jsObject, isTx.dApp(), isTx.function(), isTx.payments());
                 if (isTx.version() == 1)
                     jsObject.remove("chainId");
             } else if (tx instanceof UpdateAssetInfoTransaction) {
@@ -479,6 +481,17 @@ public abstract class JsonSerializer {
             } else if (tx instanceof InvokeExpressionTransaction) {
                 InvokeExpressionTransaction ieTx = (InvokeExpressionTransaction) tx;
                 jsObject.put("expression", ieTx.expression().encodedWithPrefix());
+            } else if (tx instanceof EthereumTransaction) {
+                EthereumTransaction et = (EthereumTransaction) tx;
+                jsObject.put("bytes", "");
+                ObjectNode payload = jsObject.putObject("payload");
+                if (et.payload() instanceof EthereumTransaction.Invocation) {
+                    EthereumTransaction.Invocation invocation = (EthereumTransaction.Invocation) et.payload();
+                    invocationToJson(payload.put("type", "invocation"), invocation.dApp(), invocation.function(), invocation.payments());
+                } else if (et.payload() instanceof EthereumTransaction.Transfer) {
+                    EthereumTransaction.Transfer transfer = (EthereumTransaction.Transfer) et.payload();
+                    transferToJson(payload.put("type", "transfer"), transfer.recipient(), transfer.amount());
+                }
             }
 
             jsObject.put("fee", tx.fee().value());
@@ -495,6 +508,28 @@ public abstract class JsonSerializer {
         return jsObject;
     }
 
+    public static ObjectNode invocationToJson(ObjectNode target, Recipient dApp, Function function, List<Amount> payments) {
+        target.put("dApp", dApp.toString());
+        if (!function.isDefault()) {
+            ObjectNode call = target.putObject("call");
+            call.put("function", function.name());
+            argsToJson(call.putArray("args"), function.args());
+        }
+        ArrayNode paymentsNode = target.putArray("payment");
+        payments.forEach(p -> {
+            ObjectNode payment = paymentsNode.addObject();
+            payment.put("amount", p.value()).
+                    put("assetId", assetIdToJson(p.assetId()));
+        });
+        return target;
+    }
+
+    public static ObjectNode transferToJson(ObjectNode target, Recipient recipient, Amount amount) {
+        return target.put("recipient", recipient.toString())
+                .put("amount", amount.value())
+                .put("assetId", assetIdToJson(amount.assetId()));
+    }
+
     public static String toPrettyJson(TransactionOrOrder txOrOrder) {
         return toJsonObject(txOrOrder).toPrettyString();
     }
@@ -509,6 +544,25 @@ public abstract class JsonSerializer {
 
     public static String assetIdToJson(AssetId assetId) {
         return assetId.isWaves() ? null : assetId.toString();
+    }
+
+    public static Function functionFromJson(JsonNode json) throws IOException {
+        Function function = Function.asDefault();
+        if (json.hasNonNull("call")) {
+            JsonNode call = json.get("call");
+            List<Arg> args = call.hasNonNull("args") ? argsFromJson(call.get("args")) : new ArrayList<>();
+            function = Function.as(call.get("function").asText(), args);
+        }
+        return function;
+    }
+
+    public static List<Amount> paymentsFromJson(JsonNode json) throws IOException {
+        List<Amount> payments = new ArrayList<>();
+        String paymentsFieldName = "payment";
+        if (json.hasNonNull(paymentsFieldName))
+            json.get(paymentsFieldName).forEach(p ->
+                    payments.add(Amount.of(p.get("amount").asLong(), assetIdFromJson(p.get("assetId")))));
+        return payments;
     }
 
     public static List<Arg> argsFromJson(JsonNode json) throws IOException {
