@@ -35,7 +35,7 @@ import static java.util.Objects.requireNonNull;
 
 public class EthereumTransaction extends Transaction {
     public static final BigInteger AMOUNT_MULTIPLIER = BigInteger.valueOf(10_000_000_000L);
-    public static final int TYPE_TAG = 19;
+    public static final int TYPE_TAG = 18;
     public static final String ERC20_PREFIX = "0xa9059cbb";
     public static final int ADDRESS_LENGTH = 20;
     public static final BigInteger DEFAULT_GAS_PRICE = Convert.toWei("10", Convert.Unit.GWEI).toBigInteger();
@@ -56,7 +56,15 @@ public class EthereumTransaction extends Transaction {
     }
 
     public EthereumTransaction(byte chainId, long timestamp, BigInteger gasPrice, long fee, Payload payload, Sign.SignatureData signatureData, PublicKey sender) {
-        super(0, 0, chainId, sender, Amount.of(fee), timestamp, Collections.emptyList());
+        super(TYPE_TAG, 1, chainId, sender, Amount.of(fee), timestamp, Collections.emptyList());
+        this.gasPrice = gasPrice;
+        this.payload = payload;
+        this.signatureData = signatureData;
+    }
+
+    public EthereumTransaction(Id id, byte chainId, long timestamp, BigInteger gasPrice, long fee, Payload payload, Sign.SignatureData signatureData, PublicKey sender) {
+        super(TYPE_TAG, 1, chainId, sender, Amount.of(fee), timestamp, Collections.emptyList());
+        this.id = id;
         this.gasPrice = gasPrice;
         this.payload = payload;
         this.signatureData = signatureData;
@@ -64,7 +72,10 @@ public class EthereumTransaction extends Transaction {
 
     @Override
     public Id id() {
-        return Id.as(Hash.sha3(toBytes()));
+        if (id == null) {
+            return Id.as(Hash.sha3(toBytes()));
+        }
+        return id;
     }
 
     @Override
@@ -115,11 +126,6 @@ public class EthereumTransaction extends Transaction {
     @Override
     public <T extends TransactionOrOrder> T setProof(int index, PrivateKey privateKey) {
         throw new UnsupportedOperationException("setProof");
-    }
-
-    @Override
-    public int version() {
-        throw new UnsupportedOperationException("version");
     }
 
     @Override

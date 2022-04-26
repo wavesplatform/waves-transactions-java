@@ -271,16 +271,6 @@ public abstract class ProtobufConverter {
                     .fee(pbAmountToAmount(pbTx.getFee()))
                     .timestamp(pbTx.getTimestamp())
                     .getUnsigned();
-        } else if (pbTx.hasInvokeExpression()) {
-            TransactionOuterClass.InvokeExpressionTransactionData invokeExpression = pbTx.getInvokeExpression();
-            tx = InvokeExpressionTransaction
-                    .builder(new Base64String(invokeExpression.getExpression().toByteArray()))
-                    .sender(PublicKey.as(pbTx.getSenderPublicKey().toByteArray()))
-                    .chainId((byte) pbTx.getChainId())
-                    .fee(pbAmountToAmount(pbTx.getFee()))
-                    .timestamp(pbTx.getTimestamp())
-                    .version(pbTx.getVersion())
-                    .getUnsigned();
         } else throw new InvalidProtocolBufferException("Can't recognize transaction type");
 
         pbSignedTx.getProofsList().forEach(p -> tx.proofs().add(Proof.as(p.toByteArray())));
@@ -458,11 +448,6 @@ public abstract class ProtobufConverter {
                     .setAssetId(ByteString.copyFrom(uaiTx.assetId().bytes()))
                     .setName(uaiTx.name())
                     .setDescription(uaiTx.description())
-                    .build());
-        } else if (tx instanceof InvokeExpressionTransaction) {
-            InvokeExpressionTransaction iet = (InvokeExpressionTransaction) tx;
-            protoBuilder.setInvokeExpression(TransactionOuterClass.InvokeExpressionTransactionData.newBuilder()
-                    .setExpression(ByteString.copyFrom(iet.expression().bytes()))
                     .build());
         }
 

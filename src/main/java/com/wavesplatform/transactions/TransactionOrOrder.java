@@ -18,7 +18,7 @@ import java.util.Objects;
 @SuppressWarnings({"UnusedReturnValue", "unchecked", "unused"})
 public abstract class TransactionOrOrder {
 
-    private Id id;
+    protected Id id;
     private final int version;
     private final byte chainId;
     private final PublicKey sender;

@@ -27,7 +27,7 @@ import java.util.List;
 
 public abstract class JsonSerializer {
 
-    public static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+    public static final ObjectMapper JSON_MAPPER = new WavesTransactionsJsonMapper();
 
     public static Order orderFromJson(JsonNode json) throws IOException {
         int version = json.get("version").asInt();
@@ -233,9 +233,6 @@ public abstract class JsonSerializer {
             String name = json.get("name").asText();
             String description = json.get("description").asText();
             return new UpdateAssetInfoTransaction(sender, assetId, name, description, chainId, fee, timestamp, version, proofs);
-        } else if (type == InvokeExpressionTransaction.TYPE) {
-            Base64String expression = base64FromJson(json, "expression");
-            return new InvokeExpressionTransaction(sender, expression, chainId, fee, timestamp, version, proofs);
         } else if (type == EthereumTransaction.TYPE_TAG) {
             RawTransaction rt = TransactionDecoder.decode(json.get("bytes").asText());
             Sign.SignatureData signatureData = rt instanceof SignedRawTransaction ?
@@ -243,6 +240,13 @@ public abstract class JsonSerializer {
                     new Sign.SignatureData(new byte[]{chainId}, new byte[]{}, new byte[]{});
 
             JsonNode payload = json.get("payload");
+            if (payload == null) {
+                String id = json.get("id").asText();
+                return new EthereumTransaction(new Id(id),
+                        chainId, rt.getNonce().longValueExact(), rt.getGasPrice(),
+                        fee.value(), null, signatureData, sender
+                );
+            }
             switch (payload.get("type").asText()) {
                 case "invocation":
                     return new EthereumTransaction(chainId, rt.getNonce().longValueExact(), rt.getGasPrice(), fee.value(),
@@ -251,11 +255,11 @@ public abstract class JsonSerializer {
                                     functionFromJson(payload.get("call")),
                                     paymentsFromJson(payload.get("payment"))), signatureData, sender);
                 case "transfer":
-                    AssetId assetId = assetIdFromJson(payload.get("assetId"));
+                    AssetId assetId = assetIdFromJson(payload.get("asset"));
                     return new EthereumTransaction(chainId, rt.getNonce().longValueExact(), rt.getGasPrice(), fee.value(),
                             new EthereumTransaction.Transfer(
-                                    Address.as(payload.get("dApp").asText()),
-                                    Amount.of(json.get("amount").asLong(), assetId)
+                                    Address.as(payload.get("recipient").asText()),
+                                    Amount.of(payload.get("amount").asLong(), assetId)
                             ), signatureData, sender);
                 default:
                     throw new IOException("Unsupported payload type");
@@ -478,9 +482,6 @@ public abstract class JsonSerializer {
                 jsObject.put("assetId", assetIdToJson(uaiTx.assetId()))
                         .put("name", uaiTx.name())
                         .put("description", uaiTx.description());
-            } else if (tx instanceof InvokeExpressionTransaction) {
-                InvokeExpressionTransaction ieTx = (InvokeExpressionTransaction) tx;
-                jsObject.put("expression", ieTx.expression().encodedWithPrefix());
             } else if (tx instanceof EthereumTransaction) {
                 EthereumTransaction et = (EthereumTransaction) tx;
                 jsObject.put("bytes", "");
