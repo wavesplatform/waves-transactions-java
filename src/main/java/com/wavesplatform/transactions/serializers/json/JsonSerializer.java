@@ -240,8 +240,8 @@ public abstract class JsonSerializer {
                     new Sign.SignatureData(new byte[]{chainId}, new byte[]{}, new byte[]{});
 
             JsonNode payload = json.get("payload");
+            String id = json.get("id").asText();
             if (payload == null) {
-                String id = json.get("id").asText();
                 return new EthereumTransaction(new Id(id),
                         chainId, rt.getNonce().longValueExact(), rt.getGasPrice(),
                         fee.value(), null, signatureData, sender
@@ -249,14 +249,14 @@ public abstract class JsonSerializer {
             }
             switch (payload.get("type").asText()) {
                 case "invocation":
-                    return new EthereumTransaction(chainId, rt.getNonce().longValueExact(), rt.getGasPrice(), fee.value(),
+                    return new EthereumTransaction(new Id(id), chainId, rt.getNonce().longValueExact(), rt.getGasPrice(), fee.value(),
                             new EthereumTransaction.Invocation(
                                     Address.as(payload.get("dApp").asText()),
-                                    functionFromJson(payload.get("call")),
-                                    paymentsFromJson(payload.get("payment"))), signatureData, sender);
+                                    functionFromJson(payload),
+                                    paymentsFromJson(payload)), signatureData, sender);
                 case "transfer":
                     AssetId assetId = assetIdFromJson(payload.get("asset"));
-                    return new EthereumTransaction(chainId, rt.getNonce().longValueExact(), rt.getGasPrice(), fee.value(),
+                    return new EthereumTransaction(new Id(id) ,chainId, rt.getNonce().longValueExact(), rt.getGasPrice(), fee.value(),
                             new EthereumTransaction.Transfer(
                                     Address.as(payload.get("recipient").asText()),
                                     Amount.of(payload.get("amount").asLong(), assetId)
