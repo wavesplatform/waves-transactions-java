@@ -285,17 +285,20 @@ public abstract class JsonSerializer {
     public static DataEntry dataEntryFromJson(JsonNode json) {
         String key = json.get("key").asText();
         String entryType = json.hasNonNull("type") ? json.get("type").asText() : "";
-        if (entryType.isEmpty())
-            return new DeleteEntry(key);
-        else if (entryType.equals("binary"))
-            return new BinaryEntry(key, Base64.decode(json.get("value").asText()));
-        else if (entryType.equals("boolean"))
-            return new BooleanEntry(key, json.get("value").asBoolean());
-        else if (entryType.equals("integer"))
-            return new IntegerEntry(key, json.get("value").asLong());
-        else if (entryType.equals("string"))
-            return new StringEntry(key, json.get("value").asText());
-        else throw new IllegalArgumentException("Unknown type `" + entryType + "` of entry with key `" + key + "`");
+        switch (entryType) {
+            case "":
+                return new DeleteEntry(key);
+            case "binary":
+                return new BinaryEntry(key, Base64.decode(json.get("value").asText()));
+            case "boolean":
+                return new BooleanEntry(key, json.get("value").asBoolean());
+            case "integer":
+                return new IntegerEntry(key, json.get("value").asLong());
+            case "string":
+                return new StringEntry(key, json.get("value").asText());
+            default:
+                throw new IllegalArgumentException("Unknown type `" + entryType + "` of entry with key `" + key + "`");
+        }
     }
 
     public static JsonNode toJsonObject(TransactionOrOrder txOrOrder) {

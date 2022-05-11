@@ -228,21 +228,27 @@ public class EthereumTransaction extends Transaction {
 
         private void addArgs(ArrayList<Type> target, List<Arg> source, boolean allowNesting) {
             for (Arg arg : source) {
-                if (arg instanceof BinaryArg) {
-                    target.add(new DynamicBytes(((BinaryArg) arg).value().bytes()));
-                } else if (arg instanceof StringArg) {
-                    target.add(new Utf8String(((StringArg) arg).value()));
-                } else if (arg instanceof IntegerArg) {
-                    target.add(new Int64(((IntegerArg) arg).value()));
-                } else if (arg instanceof BooleanArg) {
-                    target.add(new Uint8(((BooleanArg) arg).value() ? 1 : 0));
-                } else if (arg instanceof ListArg) {
-                    if (!allowNesting) {
-                        throw new IllegalArgumentException("Nested lists are not supported");
-                    }
-                    ArrayList<Type> listValues = new ArrayList<>();
-                    addArgs(listValues, ((ListArg) arg).value(), false);
-                    target.add(new DynamicArray<>(listValues));
+                switch (arg.type()) {
+                    case BINARY:
+                        target.add(new DynamicBytes(((BinaryArg) arg).value().bytes()));
+                        break;
+                    case STRING:
+                        target.add(new Utf8String(((StringArg) arg).value()));
+                        break;
+                    case INTEGER:
+                        target.add(new Int64(((IntegerArg) arg).value()));
+                        break;
+                    case BOOLEAN:
+                        target.add(new Uint8(((BooleanArg) arg).value() ? 1 : 0));
+                        break;
+                    case LIST:
+                        if (!allowNesting) {
+                            throw new IllegalArgumentException("Nested lists are not supported");
+                        }
+                        ArrayList<Type> listValues = new ArrayList<>();
+                        addArgs(listValues, ((ListArg) arg).value(), false);
+                        target.add(new DynamicArray<>(Type.class, listValues));
+                        break;
                 }
             }
         }

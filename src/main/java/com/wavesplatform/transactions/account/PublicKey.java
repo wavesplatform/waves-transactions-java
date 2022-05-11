@@ -88,10 +88,9 @@ public class PublicKey extends Base58String {
      * @return address
      */
     public Address address(byte chainId) {
-        if (bytes.length == BYTES_LENGTH)
-            return Address.from(chainId, this);
-        else
-            return Address.fromPart(chainId, Arrays.copyOfRange(Hash.keccak(bytes), 12, 32));
+        return bytes.length == BYTES_LENGTH ?
+                Address.from(chainId, this)
+                : Address.fromPart(chainId, Arrays.copyOfRange(Hash.keccak(bytes), 12, 32));
     }
 
     /**
