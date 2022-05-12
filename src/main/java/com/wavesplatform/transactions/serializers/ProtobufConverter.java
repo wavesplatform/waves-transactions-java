@@ -52,8 +52,16 @@ public abstract class ProtobufConverter {
     }
 
     public static Transaction fromProtobuf(TransactionOuterClass.SignedTransaction pbSignedTx) throws IOException {
+        if (!pbSignedTx.getEthereumTransaction().isEmpty()) {
+            return EthereumTransaction.parse(pbSignedTx.getEthereumTransaction().toByteArray());
+        }
+
+        if (!pbSignedTx.hasWavesTransaction()) {
+            throw new InvalidProtocolBufferException("Both waves transaction and ethereum transactions are missing");
+        }
+
         Transaction tx;
-        TransactionOuterClass.Transaction pbTx = pbSignedTx.getTransaction();
+        TransactionOuterClass.Transaction pbTx = pbSignedTx.getWavesTransaction();
 
         if (pbTx.hasGenesis()) {
             TransactionOuterClass.GenesisTransactionData genesis = pbTx.getGenesis();
@@ -243,9 +251,9 @@ public abstract class ProtobufConverter {
             TransactionOuterClass.InvokeScriptTransactionData invoke = pbTx.getInvokeScript();
             Function functionCall = new BytesReader(invoke.getFunctionCall().toByteArray()).readFunctionCall();
             tx = InvokeScriptTransaction
-                    .builder(recipientFromProto(invoke.getDApp(), (byte)pbTx.getChainId()), functionCall)
+                    .builder(recipientFromProto(invoke.getDApp(), (byte) pbTx.getChainId()), functionCall)
                     .payments(invoke.getPaymentsList().stream().map(p ->
-                            Amount.of(p.getAmount(), AssetId.as(p.getAssetId().toByteArray())))
+                                    Amount.of(p.getAmount(), AssetId.as(p.getAssetId().toByteArray())))
                             .collect(toList()))
                     .version(pbTx.getVersion())
                     .chainId((byte) pbTx.getChainId())
@@ -379,14 +387,14 @@ public abstract class ProtobufConverter {
         } else if (tx instanceof MassTransferTransaction) {
             MassTransferTransaction mtTx = (MassTransferTransaction) tx;
             protoBuilder.setMassTransfer(TransactionOuterClass.MassTransferTransactionData.newBuilder()
-                    .addAllTransfers(mtTx.transfers().stream().map(t ->
-                        TransactionOuterClass.MassTransferTransactionData.Transfer.newBuilder()
-                                .setRecipient(recipientToProto(t.recipient()))
-                                .setAmount(t.amount())
-                                .build()
-                    ).collect(toList()))
-                    .setAssetId(ByteString.copyFrom(mtTx.assetId().bytes()))
-                    .setAttachment(ByteString.copyFrom(mtTx.attachment().bytes())))
+                            .addAllTransfers(mtTx.transfers().stream().map(t ->
+                                    TransactionOuterClass.MassTransferTransactionData.Transfer.newBuilder()
+                                            .setRecipient(recipientToProto(t.recipient()))
+                                            .setAmount(t.amount())
+                                            .build()
+                            ).collect(toList()))
+                            .setAssetId(ByteString.copyFrom(mtTx.assetId().bytes()))
+                            .setAttachment(ByteString.copyFrom(mtTx.attachment().bytes())))
                     .build();
         } else if (tx instanceof DataTransaction) {
             DataTransaction dtx = (DataTransaction) tx;
@@ -394,10 +402,11 @@ public abstract class ProtobufConverter {
                     .addAllData(dtx.data().stream().map(e -> {
                         TransactionOuterClass.DataTransactionData.DataEntry.Builder builder =
                                 TransactionOuterClass.DataTransactionData.DataEntry.newBuilder().setKey(e.key());
-                        if (e instanceof BinaryEntry) builder.setBinaryValue(ByteString.copyFrom(((BinaryEntry)e).value().bytes())).build();
-                        else if (e instanceof BooleanEntry) builder.setBoolValue(((BooleanEntry)e).value()).build();
-                        else if (e instanceof IntegerEntry) builder.setIntValue(((IntegerEntry)e).value()).build();
-                        else if (e instanceof StringEntry) builder.setStringValue(((StringEntry)e).value()).build();
+                        if (e instanceof BinaryEntry)
+                            builder.setBinaryValue(ByteString.copyFrom(((BinaryEntry) e).value().bytes())).build();
+                        else if (e instanceof BooleanEntry) builder.setBoolValue(((BooleanEntry) e).value()).build();
+                        else if (e instanceof IntegerEntry) builder.setIntValue(((IntegerEntry) e).value()).build();
+                        else if (e instanceof StringEntry) builder.setStringValue(((StringEntry) e).value()).build();
                         else if (e instanceof DeleteEntry) builder.setKey(e.key());
                         else throw new IllegalArgumentException("Unknown entry type " + e.type());
                         return builder.build();
@@ -447,6 +456,7 @@ public abstract class ProtobufConverter {
 
     public static OrderOuterClass.Order toProtobuf(Order order) {
         return OrderOuterClass.Order.newBuilder(toUnsignedProtobuf(order))
+                .setEip712Signature(order.eip712Signature() == null ? ByteString.EMPTY : ByteString.copyFrom(order.eip712Signature()))
                 .addAllProofs(order.proofs()
                         .stream()
                         .map(p -> ByteString.copyFrom(p.bytes()))
@@ -456,7 +466,7 @@ public abstract class ProtobufConverter {
 
     public static TransactionOuterClass.SignedTransaction toProtobuf(Transaction tx) {
         return TransactionOuterClass.SignedTransaction.newBuilder()
-                .setTransaction(toUnsignedProtobuf(tx))
+                .setWavesTransaction(toUnsignedProtobuf(tx))
                 .addAllProofs(tx.proofs()
                         .stream()
                         .map(p -> ByteString.copyFrom(p.bytes()))

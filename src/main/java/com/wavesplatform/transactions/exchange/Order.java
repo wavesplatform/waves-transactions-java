@@ -12,6 +12,7 @@ import com.wavesplatform.transactions.serializers.binary.BinarySerializer;
 import com.wavesplatform.transactions.serializers.json.JsonSerializer;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -25,6 +26,7 @@ public class Order extends TransactionOrOrder {
     private final Amount price;
     private final PublicKey matcher;
     private final long expiration;
+    private final byte[] eip712Signature;
 
     public Order(PublicKey sender, OrderType type, Amount amount, Amount price, PublicKey matcher) {
         this(sender, type, amount, price, matcher, WavesConfig.chainId(), Amount.of(MIN_FEE), System.currentTimeMillis(),
@@ -39,16 +41,13 @@ public class Order extends TransactionOrOrder {
     public Order(PublicKey sender, OrderType type, Amount amount, Amount price, PublicKey matcher, byte chainId,
                  Amount fee, long timestamp, long expiration, int version, List<Proof> proofs) {
         super(version, chainId, sender, fee, timestamp, proofs);
-        if (type == null) throw new IllegalArgumentException("Order type can't be null");
-        if (amount == null) throw new IllegalArgumentException("Order amount pair can't be null");
-        if (price == null) throw new IllegalArgumentException("Order price pair can't be null");
-        if (matcher == null) throw new IllegalArgumentException("Order matcher public key can't be null");
+        this.type = Objects.requireNonNull(type, "Order type can't be null");
+        this.amount = Objects.requireNonNull(amount, "Order amount pair can't be null");
+        this.price = Objects.requireNonNull(price, "Order price pair can't be null");
+        this.matcher = Objects.requireNonNull(matcher, "Order matcher public key can't be null");
 
-        this.type = type;
-        this.amount = amount;
-        this.price = price;
-        this.matcher = matcher;
         this.expiration = expiration;
+        this.eip712Signature = null;
     }
 
     public static Order fromBytes(byte[] bytes) throws IOException {
@@ -99,6 +98,8 @@ public class Order extends TransactionOrOrder {
         return expiration;
     }
 
+    public byte[] eip712Signature() { return eip712Signature; }
+
     public OrderOuterClass.Order toProtobuf() {
         return ProtobufConverter.toProtobuf(this);
     }
@@ -114,7 +115,7 @@ public class Order extends TransactionOrOrder {
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), bodyBytes());
+        return Objects.hash(super.hashCode(), Arrays.hashCode(bodyBytes()));
     }
 
     public static class OrderBuilder extends TransactionOrOrderBuilder<OrderBuilder, Order> {
@@ -123,6 +124,7 @@ public class Order extends TransactionOrOrder {
         private final Amount price;
         private final PublicKey matcher;
         private long expiration;
+        private byte[] eip712Signature;
 
         protected OrderBuilder(OrderType type, Amount amount, Amount price, PublicKey matcher) {
             super(LATEST_VERSION, MIN_FEE);
