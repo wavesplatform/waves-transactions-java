@@ -41,26 +41,8 @@ public class Order extends TransactionOrOrder {
 
     public Order(PublicKey sender, OrderType type, Amount amount, Amount price, PublicKey matcher, byte chainId,
                  Amount fee, long timestamp, long expiration, int version, List<Proof> proofs) {
-        super(version, chainId, sender, fee, timestamp, proofs);
-        this.type = Objects.requireNonNull(type, "Order type can't be null");
-        this.amount = Objects.requireNonNull(amount, "Order amount pair can't be null");
-        this.price = Objects.requireNonNull(price, "Order price pair can't be null");
-        this.matcher = Objects.requireNonNull(matcher, "Order matcher public key can't be null");
-
-        this.expiration = expiration;
-        this.eip712Signature = null;
-    }
-
-    public Order(PublicKey sender, OrderType type, Amount amount, Amount price, PublicKey matcher, byte chainId,
-                 Amount fee, long timestamp, long expiration, int version, List<Proof> proofs, byte[] eip712Signature) {
-        super(version, chainId, sender, fee, timestamp, proofs);
-        this.type = Objects.requireNonNull(type, "Order type can't be null");
-        this.amount = Objects.requireNonNull(amount, "Order amount pair can't be null");
-        this.price = Objects.requireNonNull(price, "Order price pair can't be null");
-        this.matcher = Objects.requireNonNull(matcher, "Order matcher public key can't be null");
-
-        this.expiration = expiration;
-        this.eip712Signature = eip712Signature;
+        this(null, sender, type, amount, price, matcher, chainId, fee, timestamp, expiration,
+                version, proofs, null);
     }
 
     public Order(Id id, PublicKey sender, OrderType type, Amount amount, Amount price, PublicKey matcher, byte chainId,
