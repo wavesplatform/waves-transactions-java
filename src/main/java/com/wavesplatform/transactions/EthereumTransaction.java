@@ -283,7 +283,7 @@ public class EthereumTransaction extends Transaction {
                 new ECDSASignature(
                         new BigInteger(1, signatureData.getR()),
                         new BigInteger(1, signatureData.getS())),
-                TransactionEncoder.encode(rawTransaction, (long) chainId)
+                Hash.sha3(TransactionEncoder.encode(rawTransaction, (long) chainId))
         )));
     }
 
