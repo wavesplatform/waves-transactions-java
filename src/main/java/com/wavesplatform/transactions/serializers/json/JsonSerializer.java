@@ -16,6 +16,7 @@ import com.wavesplatform.transactions.exchange.OrderType;
 import com.wavesplatform.transactions.invocation.*;
 import com.wavesplatform.transactions.mass.Transfer;
 import com.wavesplatform.transactions.serializers.Scheme;
+import org.bouncycastle.util.encoders.Hex;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.Sign;
 import org.web3j.crypto.SignedRawTransaction;
@@ -24,6 +25,8 @@ import org.web3j.crypto.TransactionDecoder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.bouncycastle.util.encoders.Hex.decode;
 
 public abstract class JsonSerializer {
 
@@ -51,7 +54,13 @@ public abstract class JsonSerializer {
                 json.has("matcherFeeAssetId") ? assetIdFromJson(json.get("matcherFeeAssetId")) : AssetId.WAVES
         );
 
+        byte[] eip712Signature = json.hasNonNull("eip712Signature") ?
+                decode(json.get("eip712Signature").asText().substring(2)) : null;
+
+        Id id = json.hasNonNull("id") ? new Id(json.get("id").asText()) : null;
+
         return new Order(
+                id,
                 PublicKey.as(json.get("senderPublicKey").asText()),
                 type,
                 Amount.of(json.get("amount").asLong(), assetIdFromJson(json.get("assetPair").get("amountAsset"))),
@@ -62,7 +71,8 @@ public abstract class JsonSerializer {
                 json.get("timestamp").asLong(),
                 json.get("expiration").asLong(),
                 version,
-                proofs
+                proofs,
+                eip712Signature
         );
     }
 
@@ -149,7 +159,9 @@ public abstract class JsonSerializer {
             if (version == 1 && json.has("signature"))
                 proofs = Proof.list(Proof.as(json.get("signature").asText()));
 
-            return new ExchangeTransaction(sender, orderFromJson(json.get("order1")), orderFromJson(json.get("order2")),
+            Id id = json.hasNonNull("id") ? new Id(json.get("id").asText()) : null;
+
+            return new ExchangeTransaction(id, sender, orderFromJson(json.get("order1")), orderFromJson(json.get("order2")),
                     json.get("amount").asLong(), json.get("price").asLong(), json.get("buyMatcherFee").asLong(),
                     json.get("sellMatcherFee").asLong(), chainId, fee, timestamp, version, proofs);
         } else if (type == LeaseTransaction.TYPE) {

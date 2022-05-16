@@ -6,6 +6,7 @@ import com.wavesplatform.transactions.TransactionOrOrder;
 import com.wavesplatform.transactions.WavesConfig;
 import com.wavesplatform.transactions.account.PublicKey;
 import com.wavesplatform.transactions.common.Amount;
+import com.wavesplatform.transactions.common.Id;
 import com.wavesplatform.transactions.common.Proof;
 import com.wavesplatform.transactions.serializers.ProtobufConverter;
 import com.wavesplatform.transactions.serializers.binary.BinarySerializer;
@@ -48,6 +49,31 @@ public class Order extends TransactionOrOrder {
 
         this.expiration = expiration;
         this.eip712Signature = null;
+    }
+
+    public Order(PublicKey sender, OrderType type, Amount amount, Amount price, PublicKey matcher, byte chainId,
+                 Amount fee, long timestamp, long expiration, int version, List<Proof> proofs, byte[] eip712Signature) {
+        super(version, chainId, sender, fee, timestamp, proofs);
+        this.type = Objects.requireNonNull(type, "Order type can't be null");
+        this.amount = Objects.requireNonNull(amount, "Order amount pair can't be null");
+        this.price = Objects.requireNonNull(price, "Order price pair can't be null");
+        this.matcher = Objects.requireNonNull(matcher, "Order matcher public key can't be null");
+
+        this.expiration = expiration;
+        this.eip712Signature = eip712Signature;
+    }
+
+    public Order(Id id, PublicKey sender, OrderType type, Amount amount, Amount price, PublicKey matcher, byte chainId,
+                 Amount fee, long timestamp, long expiration, int version, List<Proof> proofs, byte[] eip712Signature) {
+        super(version, chainId, sender, fee, timestamp, proofs);
+        this.id = id;
+        this.type = Objects.requireNonNull(type, "Order type can't be null");
+        this.amount = Objects.requireNonNull(amount, "Order amount pair can't be null");
+        this.price = Objects.requireNonNull(price, "Order price pair can't be null");
+        this.matcher = Objects.requireNonNull(matcher, "Order matcher public key can't be null");
+
+        this.expiration = expiration;
+        this.eip712Signature = eip712Signature;
     }
 
     public static Order fromBytes(byte[] bytes) throws IOException {
