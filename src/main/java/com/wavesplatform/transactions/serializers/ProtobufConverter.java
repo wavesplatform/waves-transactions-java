@@ -383,7 +383,7 @@ public abstract class ProtobufConverter {
             builder.setOrderSide(OrderOuterClass.Order.Side.BUY);
         else if (order.type() == OrderType.SELL)
             builder.setOrderSide(OrderOuterClass.Order.Side.SELL);
-        if (order.eip712Signature() != null || order.eip712Signature().length != 0) {
+        if (order.eip712Signature() != null && order.eip712Signature().length != 0) {
             builder.setEip712Signature(ByteString.copyFrom(order.eip712Signature()));
         } else {
             builder.setSenderPublicKey(ByteString.copyFrom(order.sender().bytes()));
