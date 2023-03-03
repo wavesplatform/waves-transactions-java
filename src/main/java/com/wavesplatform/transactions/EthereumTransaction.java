@@ -39,6 +39,8 @@ public class EthereumTransaction extends Transaction {
     public static final BigInteger AMOUNT_MULTIPLIER = BigInteger.valueOf(10_000_000_000L);
     public static final int TYPE_TAG = 18;
     public static final String ERC20_PREFIX = "0xa9059cbb";
+
+    public static final String ERC20_PREFIX_WITHOUT_HEX = "a9059cbb";
     public static final int ADDRESS_LENGTH = 20;
     public static final BigInteger DEFAULT_GAS_PRICE = Convert.toWei("10", Convert.Unit.GWEI).toBigInteger();
 
@@ -342,7 +344,7 @@ public class EthereumTransaction extends Transaction {
                     srt.getNonce().longValueExact(),
                     srt.getSignatureData()
             );
-        } else if (data.startsWith(ERC20_PREFIX) && srt.getTransaction().getValue().equals(BigInteger.ZERO)) {
+        } else if ((data.startsWith(ERC20_PREFIX) || data.startsWith(ERC20_PREFIX_WITHOUT_HEX)) && srt.getTransaction().getValue().equals(BigInteger.ZERO)) {
             return EthereumTransaction.transfer(
                     Address.fromPart(
                             srt.getChainId().byteValue(),

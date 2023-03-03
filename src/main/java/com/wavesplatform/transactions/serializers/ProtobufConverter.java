@@ -30,8 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.wavesplatform.protobuf.transaction.TransactionOuterClass.DataTransactionData.DataEntry.ValueCase.*;
-import static com.wavesplatform.transactions.EthereumTransaction.AMOUNT_MULTIPLIER;
-import static com.wavesplatform.transactions.EthereumTransaction.ERC20_PREFIX;
+import static com.wavesplatform.transactions.EthereumTransaction.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 import static org.web3j.crypto.TransactionDecoder.decode;
@@ -330,7 +329,7 @@ public abstract class ProtobufConverter {
                         srt.getNonce().longValueExact(),
                         srt.getSignatureData()
                 );
-            } else if (data.startsWith(ERC20_PREFIX) && srt.getTransaction().getValue().equals(BigInteger.ZERO)) {
+            } else if ((data.startsWith(ERC20_PREFIX) || data.startsWith(ERC20_PREFIX_WITHOUT_HEX)) && srt.getTransaction().getValue().equals(BigInteger.ZERO)) {
                 return EthereumTransaction.transfer(
                         Address.fromPart(
                                 srt.getChainId().byteValue(),
@@ -356,7 +355,7 @@ public abstract class ProtobufConverter {
             SignedRawTransaction srt = (SignedRawTransaction) decode(toHexString(pbSignedTx.getEthereumTransaction().toByteArray()));
             String data = Numeric.cleanHexPrefix(srt.getTransaction().getData());
             if (data.isEmpty() && !srt.getTransaction().getValue().equals(BigInteger.ZERO)
-                    || data.startsWith(ERC20_PREFIX) && srt.getTransaction().getValue().equals(BigInteger.ZERO)) {
+                    || (data.startsWith(ERC20_PREFIX) || data.startsWith(ERC20_PREFIX_WITHOUT_HEX)) && srt.getTransaction().getValue().equals(BigInteger.ZERO)) {
                 throw new IllegalArgumentException("Transfer ethereum transaction not supported from this method");
             }
             TransactionMetadata.InvokeScriptMetadata invoke = pbTxMetadata.getEthereum().getInvoke();
